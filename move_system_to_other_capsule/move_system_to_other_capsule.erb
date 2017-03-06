@@ -1,0 +1,97 @@
+<%#
+name: Move system to other Capsule
+job_category: Capsule
+description_format: Move system to capsule %{new_capsule}
+snippet: false
+template_inputs:
+- name: new_capsule
+  required: true
+  input_type: user
+  description: The FQDN of the new Capsule
+  advanced: false
+- name: run_puppet_once
+  required: true
+  input_type: user
+  description: Whether to run Puppet once with --waitforcert enabled after configuration
+    changes have been made. If you have an auto-sign entry, set this to false, otherwise,
+    set to true and manually sign the certificate of the machine on the new Capsule.
+  options: "true\r\nfalse"
+  advanced: false
+- name: restart_puppet
+  required: true
+  input_type: user
+  description: Whether to restart Puppet after configuration changes have been made.
+    Set this to false if you run Puppet from cron.
+  options: "true\r\nfalse"
+  advanced: false
+provider_type: SSH
+kind: job_template
+%>
+
+# YOU NEED TO TAKE THE FOLLOWING MANUAL STEPS IF YOU MOVE A SYSTEM TO A NEW CAPSULE
+# - revoke the original Puppet certificate of the system on the source capsule
+# - assign new content source, puppet, puppet CA and potentially OpenSCAP capsules to your host
+#   (if you do not do that, your system will never show up on the Puppet CA tab of the new capsule, 
+#    and katello-rhsm-consumer will never update the repository URLs correctly)
+
+# THE JOB TEMPLATE WILL DO THE FOLLOWING THINGS TO MOVE YOUR SYSTEM TO A NEW CAPSULE
+# - Removes katello-ca-consumer-${previous_capsule} RPM
+# - Downloads and installs the katello-ca-consumer-latest RPM from the destination capsule
+# - Runs the katello-rhsm-consumer script to switch goferd and rhsm over to the capsule
+# - Stops Puppet
+# - Makes changes to Puppet configuration: puppetmaster setting
+# - delete contents of /var/lib/puppet/ssl
+# - delete /var/lib/puppet/client_data/catalog/${fqdn}.json
+# - Manually runs Puppet with --waitforcert
+# - Starts Puppet daemon backup, if required
+
+echo "Removing old katello-ca-consumer RPM..."
+rpm -qa | grep katello-ca-consumer | xargs yum -y remove
+
+echo "Downloading new katello-ca-consumer RPM..."
+wget http://<%= input(:new_capsule) -%>/pub/katello-ca-consumer-latest.noarch.rpm -O /tmp/katello-ca-consumer-latest.noarch.rpm
+
+echo "Installing new katello-ca-consumer RPM..."
+yum -y localinstall /tmp/katello-ca-consumer-latest.noarch.rpm
+
+echo "Running katello-rhsm-consumer to update configuration..."
+/usr/bin/katello-rhsm-consumer
+
+echo "Restarting services..."
+if ( grep -q Maipo /etc/redhat-release); then
+  systemctl restart goferd rhsmcertd
+else 
+  service goferd restart
+  service rhsmcertd restart
+fi 
+
+echo "Stopping Puppet..."
+if ( grep -q Maipo /etc/redhat-release); then
+  systemctl stop puppet
+else
+  service puppet stop
+fi
+
+echo "Updating Puppet configuration..."
+puppet config set --section agent server <%= input(:new_capsule) -%>
+
+echo "Removing old certificate, CA, CSR, cached catalog, etc. ..."
+mkdir /root/pup_backup
+cp -r /var/lib/puppet/ssl /root/pup_backup
+rm -rf /var/lib/puppet/ssl
+cp /var/lib/puppet/client_data/catalog/*.json /root/pup_backup
+rm -f /var/lib/puppet/client_data/catalog/*.json
+
+if ( /bin/<%= input(:run_puppet_once) -%> ); then
+  echo "Running Puppet once with waitforcert enabled..."
+  puppet agent -t --waitforcert 20
+fi
+
+if ( /bin/<%= input(:restart_puppet) -%> ); then
+  echo "Restarting Puppet daemon..."
+  if ( grep -q Maipo /etc/redhat-release); then
+    systemctl start puppet
+  else 
+    service puppet start
+  fi 
+fi
