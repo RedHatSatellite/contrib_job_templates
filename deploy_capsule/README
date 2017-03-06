@@ -1,0 +1,6 @@
+# deploy_capsule
+## Deploy a capsule on an existing machine through REx
+
+First, run the deploy_capsule_to_satellite.erb job to create the necessary
+certificates and copy them over to the capsule. The install_capsule.erb is run
+automatically through Hammer if the deploy_capsule_to_satellite.erb succeeds.

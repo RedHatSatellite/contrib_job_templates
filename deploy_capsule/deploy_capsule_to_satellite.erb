@@ -1,0 +1,45 @@
+<%#
+name: Deploy Capslule to Satellite
+job_category: Capsule
+description_format: Deploy capsule %{capsule_fqdn}
+snippet: false
+template_inputs:
+- name: capsule_fqdn
+  required: true
+  input_type: user
+  description: Fqdn of the capsule to deploy
+  advanced: false
+provider_type: SSH
+kind: job_template
+%>
+
+# Prerequisite:
+# 1) Having hammer configured to let root user to control Satellite:
+#
+#    cat ~/.hammer/cli.modules.d/foreman.ym
+#    :foreman:
+#      :uesrname: 'admin'
+#      :password: 'changeme'
+#
+# 2) Having ability to target the Satellite via remote execution
+#
+# 3) The target capsule machine configured to be controlled by remote execution from the Satellite server
+
+if ! rpm -q satellite 2>b1 > /dev/null; then
+  echo "The script needs to be run on Satellite"
+  exit 1
+fi
+
+
+mkdir -p ~/satellite-shared-secrets
+<% certs_tar = "$HOME/satellite-shared-secrets/#{ input(:capsule_fqdn) }.tar.gz" %>
+capsule-certs-generate --no-colors --capsule-fqdn="<%= input(:capsule_fqdn) %>" --certs-tar="<%= certs_tar %>"
+
+cp -r ~foreman-proxy/.ssh/id_rsa_foreman_proxy* ~/satellite-shared-secrets
+grep '^oauth_secret' /etc/pulp/server.conf | cut -d' ' -f2 > ~/satellite-shared-secrets/pulp-oauth-secret
+grep '^:oauth_consumer_key' /etc/foreman/settings.yaml | cut -d' ' -f2 > ~/satellite-shared-secrets/foreman-oauth-key
+grep '^:oauth_consumer_secret' /etc/foreman/settings.yaml | cut -d' ' -f2 > ~/satellite-shared-secrets/foreman-oauth-secret
+
+scp -i ~foreman-proxy/.ssh/id_rsa_foreman_proxy -r ~/satellite-shared-secrets root@<%= input(:capsule_fqdn) %>:~
+
+hammer job-invocation create --job-template "Install Capsule" --inputs="satellite_fqdn=<%= @host.name %>" --search-query="name = <%= input(:capsule_fqdn) %>"
