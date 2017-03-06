@@ -1,0 +1,26 @@
+# Moving a system to a new Capsule server
+## move_system_to_other_capsule
+
+The job template move_system_to_other_capsule can help you easily migrate
+existing systems to another Capsule to spread load.
+
+The template assumes you have done the following things manually:
+
+- first of all, you need to assign the new Capsule as content source, Puppet
+  Master, Puppet CA and, potentially, Openscap Capsule. If you do not do this,
+  various things will not work correctly.
+
+  To be exact:
+    - setting Content Source makes the katello-rhsm-consumer script work
+      correctly setting up /etc/yum.repos.d/* and /etc/rhsm/rhsm.conf
+    - setting a Puppet Master / CA is especially important if you manage
+      puppet.conf with puppet, for obvious reasons, but even if you do not do
+      that: your system will only show up on the 'Puppet' Tab of the Capsule
+      page of the new Capsule if this is set correctly
+    - setting OpenSCAP Capsule will make the client send it's OpenSCAP reports
+      to the right host. This parameter is used by Puppet to configure the
+      foreman_scap_client.
+
+- after you run the job, you manually have to revoke the SSL client certificate
+  for the systems on the old Capsule. The job template will not do that for
+  you.
