@@ -21,6 +21,24 @@ The template assumes you have done the following things manually:
       to the right host. This parameter is used by Puppet to configure the
       foreman_scap_client.
 
+- after the job is done, Puppet on the client will send a CSR to the Capsule.
+  You have to sign that manually.
+
 - after you run the job, you manually have to revoke the SSL client certificate
   for the systems on the old Capsule. The job template will not do that for
   you.
+
+In short, to use this job:
+
+- Import it into Satellite through Job Templates -> Import
+- Alter the content Source, Puppet Master, Puppet CA and OpenSCAP Capsule
+  settings in your client(s) to point to your new capsule
+- Run the job on your client(s), providing it with the name of the new Capsule
+  and, optionally, whether you want to run Puppet once with --waitforcert
+  enabled, and whether you want to restart Puppet after the job is done.
+- Either sign the CSR or, if you have an auto-sign rule, get some coffee
+- Revoke the old cert on the old Capsule for you client(s)
+
+To do:
+  - this job template does not do error checking, nor does it roll back in case
+    of error
