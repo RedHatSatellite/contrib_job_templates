@@ -1,5 +1,5 @@
 <%#
-name: Deploy Capslule to Satellite
+name: Deploy Capsule to Satellite
 job_category: Capsule
 description_format: Deploy capsule %{capsule_fqdn}
 snippet: false
@@ -7,7 +7,7 @@ template_inputs:
 - name: capsule_fqdn
   required: true
   input_type: user
-  description: Fqdn of the capsule to deploy
+  description: FQDN of the capsule to deploy
   advanced: false
 provider_type: SSH
 kind: job_template
@@ -16,14 +16,14 @@ kind: job_template
 # Prerequisite:
 # 1) Having hammer configured to let root user to control Satellite:
 #
-#    cat ~/.hammer/cli.modules.d/foreman.ym
+#    cat ~/.hammer/cli.modules.d/foreman.yml
 #    :foreman:
-#      :uesrname: 'admin'
+#      :username: 'admin'
 #      :password: 'changeme'
 #
 # 2) Having ability to target the Satellite via remote execution
 #
-# 3) The target capsule machine configured to be controlled by remote execution from the Satellite server
+# 3) The target capsule machine needs to be configured to be controlled by remote execution from the Satellite server
 
 if ! rpm -q satellite 2>b1 > /dev/null; then
   echo "The script needs to be run on Satellite"
